@@ -46,13 +46,7 @@ The result: nodes appear invisible, topics don't show up, and hours are lost deb
 
 ## Installation
 
-### Option A — pip (recommended)
-
-```bash
-pip install ros2-network-fixer
-```
-
-### Option B — From source
+### Option A — From source
 
 ```bash
 git clone https://github.com/Krymorn/ros2_network_fixer.git
@@ -60,7 +54,7 @@ cd ros2_network_fixer
 pip install .
 ```
 
-### Option C — Quick-start script (no pre-install needed)
+### Option B — Quick-start script (no pre-install needed)
 
 **Linux / macOS / WSL2:**
 ```bash
