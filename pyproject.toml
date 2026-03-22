@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "ros2-network-fixer"
+version = "1.0.0"
+description = "Cross-platform ROS 2 DDS network fixer — automates Discovery Server, firewall, and WSL2 configuration"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = ["ros2", "dds", "network", "wsl2", "fastdds", "robotics"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: System :: Networking",
+]
+
+# No third-party dependencies — intentional.
+# We rely only on the Python standard library so the tool works even
+# in environments where pip packages are restricted.
+dependencies = []
+
+[project.scripts]
+ros2_network_fixer = "ros2_network_fixer.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/YOUR_USERNAME/ros2-network-fixer"
+Issues = "https://github.com/YOUR_USERNAME/ros2-network-fixer/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ros2_network_fixer*"]
