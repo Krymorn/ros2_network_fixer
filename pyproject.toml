@@ -35,8 +35,8 @@ dependencies = []
 ros2_network_fixer = "ros2_network_fixer.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/YOUR_USERNAME/ros2-network-fixer"
-Issues = "https://github.com/YOUR_USERNAME/ros2-network-fixer/issues"
+Homepage = "https://github.com/Krymorn/ros2_network_fixer"
+Issues = "https://github.com/Krymorn/ros2_network_fixer/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
