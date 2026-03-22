@@ -55,8 +55,8 @@ pip install ros2-network-fixer
 ### Option B — From source
 
 ```bash
-git clone https://github.com/Krymorn/ros2-network-fixer.git
-cd ros2-network-fixer
+git clone https://github.com/Krymorn/ros2_network_fixer.git
+cd ros2_network_fixer
 pip install .
 ```
 
