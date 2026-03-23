@@ -51,7 +51,7 @@ The result: nodes appear invisible, topics don't show up, and hours are lost deb
 ```bash
 git clone https://github.com/Krymorn/ros2_network_fixer.git
 cd ros2_network_fixer
-ros2_network_fixer --fix all
+ros2_network_fixer
 ```
 
 ### Option B — Quick-start script (once cloned)
