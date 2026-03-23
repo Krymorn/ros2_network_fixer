@@ -51,10 +51,10 @@ The result: nodes appear invisible, topics don't show up, and hours are lost deb
 ```bash
 git clone https://github.com/Krymorn/ros2_network_fixer.git
 cd ros2_network_fixer
-pip install .
+ros2_network_fixer --fix all
 ```
 
-### Option B — Quick-start script (no pre-install needed)
+### Option B — Quick-start script (once cloned)
 
 **Linux / macOS / WSL2:**
 ```bash
