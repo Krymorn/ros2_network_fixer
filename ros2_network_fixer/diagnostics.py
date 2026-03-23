@@ -20,6 +20,14 @@ from typing import Optional
 from .platform_utils import EnvironmentInfo, _run
 from . import ui
 
+# Lazy import to avoid circular dependency — security imports diagnostics.CheckResult
+def _get_security_checks(env):
+    try:
+        from .security import check_security_posture
+        return check_security_posture(env)
+    except Exception:
+        return []
+
 
 # ---------------------------------------------------------------------------
 # Result types
@@ -329,6 +337,9 @@ def run_diagnostics(env: EnvironmentInfo, verbose: bool = False) -> DiagReport:
     report.results.append(topic_check)
     report.nodes = nodes
     report.topics = topics
+
+    # Security posture checks (always included — insecure default is worth surfacing)
+    report.results.extend(_get_security_checks(env))
 
     return report
 

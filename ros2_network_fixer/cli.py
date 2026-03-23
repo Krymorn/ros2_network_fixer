@@ -8,11 +8,15 @@ Usage:
   ros2_network_fixer --fix discovery     # Discovery server only
   ros2_network_fixer --fix firewall      # Firewall rules only
   ros2_network_fixer --fix wsl2          # WSL2 networking mode
+  ros2_network_fixer --fix security      # SROS2 / DDS-Security setup
   ros2_network_fixer --info              # Print environment info
   ros2_network_fixer --server-start      # Start discovery server
   ros2_network_fixer --server-stop       # Stop discovery server
   ros2_network_fixer --server-ip <IP>    # Override server IP
   ros2_network_fixer --server-port <N>   # Override server port
+  ros2_network_fixer --security-strategy Enforce|Permissive
+  ros2_network_fixer --security-keystore <path>
+  ros2_network_fixer --security-enclaves /node1,/node2
   ros2_network_fixer --yes               # Non-interactive (auto-confirm)
 """
 
@@ -20,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Optional
 
 from . import ui
@@ -33,6 +38,12 @@ from .discovery import (
 )
 from .firewall import fix_firewall, print_firewall_info
 from .wsl2 import fix_wsl2_networking, detect_wsl2_status, print_docker_note
+from .security import (
+    setup_security,
+    print_security_status,
+    check_security_posture,
+    DEFAULT_KEYSTORE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -60,9 +71,9 @@ def _build_parser() -> argparse.ArgumentParser:
     mode.add_argument(
         "--fix", "-f",
         metavar="TARGET",
-        choices=["all", "discovery", "firewall", "wsl2"],
+        choices=["all", "discovery", "firewall", "wsl2", "security"],
         help=(
-            "Apply a specific fix: all | discovery | firewall | wsl2. "
+            "Apply a specific fix: all | discovery | firewall | wsl2 | security. "
             "'all' applies every available fix for your environment."
         ),
     )
@@ -95,6 +106,32 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DISCOVERY_SERVER_PORT,
         help=f"Port for the Discovery Server (default: {DISCOVERY_SERVER_PORT}).",
     )
+    # Security options
+    p.add_argument(
+        "--security-strategy",
+        metavar="STRATEGY",
+        choices=["Enforce", "Permissive"],
+        default="Enforce",
+        help=(
+            "SROS2 security strategy: Enforce (block unsigned nodes) or "
+            "Permissive (allow unsigned but log them). Default: Enforce."
+        ),
+    )
+    p.add_argument(
+        "--security-keystore",
+        metavar="PATH",
+        default=None,
+        help=f"Path for the SROS2 keystore (default: {DEFAULT_KEYSTORE}).",
+    )
+    p.add_argument(
+        "--security-enclaves",
+        metavar="ENCLAVES",
+        default=None,
+        help=(
+            "Comma-separated list of ROS 2 enclave paths to create, "
+            "e.g. '/talker,/listener'. Optional."
+        ),
+    )
     p.add_argument(
         "--yes", "-y",
         action="store_true",
@@ -117,15 +154,18 @@ def _build_parser() -> argparse.ArgumentParser:
 def textwrap_epilog() -> str:
     return """
 examples:
-  ros2_network_fixer                       Run interactive wizard
-  ros2_network_fixer --diagnose            Check network health
-  ros2_network_fixer --fix all             Apply all fixes
-  ros2_network_fixer --fix discovery       Set up Discovery Server
-  ros2_network_fixer --fix firewall        Open DDS firewall ports
-  ros2_network_fixer --fix wsl2            Fix WSL2 networking mode
-  ros2_network_fixer --fix all --yes       Non-interactive fix-all
-  ros2_network_fixer --server-start        Start discovery server process
-  ros2_network_fixer --server-stop         Stop discovery server process
+  ros2_network_fixer                                     Run interactive wizard
+  ros2_network_fixer --diagnose                          Check network health
+  ros2_network_fixer --fix all                           Apply all fixes
+  ros2_network_fixer --fix discovery                     Set up Discovery Server
+  ros2_network_fixer --fix firewall                      Open DDS firewall ports
+  ros2_network_fixer --fix wsl2                          Fix WSL2 networking mode
+  ros2_network_fixer --fix security                      Enable SROS2 encryption
+  ros2_network_fixer --fix security --security-strategy Permissive
+  ros2_network_fixer --fix security --security-enclaves /talker,/listener
+  ros2_network_fixer --fix all --yes                     Non-interactive fix-all
+  ros2_network_fixer --server-start                      Start discovery server
+  ros2_network_fixer --server-stop                       Stop discovery server
   ros2_network_fixer --server-ip 192.168.1.10 --fix discovery
 """
 
@@ -167,6 +207,7 @@ def _print_env_info(env: EnvironmentInfo) -> None:
 
     show_discovery_status()
     print_firewall_info(env)
+    print_security_status()
 
 
 def _do_fix_discovery(env: EnvironmentInfo, args: argparse.Namespace) -> bool:
@@ -186,6 +227,21 @@ def _do_fix_wsl2(env: EnvironmentInfo, args: argparse.Namespace) -> bool:
     return fix_wsl2_networking(env, auto_apply=args.yes)
 
 
+def _do_fix_security(env: EnvironmentInfo, args: argparse.Namespace) -> bool:
+    keystore = Path(args.security_keystore) if args.security_keystore else None
+    enclaves = (
+        [e.strip() for e in args.security_enclaves.split(",") if e.strip()]
+        if args.security_enclaves else None
+    )
+    return setup_security(
+        env,
+        keystore=keystore,
+        strategy=args.security_strategy,
+        enclaves=enclaves,
+        auto_apply=args.yes,
+    )
+
+
 def _do_fix_all(env: EnvironmentInfo, args: argparse.Namespace) -> bool:
     results = []
     steps = []
@@ -195,6 +251,8 @@ def _do_fix_all(env: EnvironmentInfo, args: argparse.Namespace) -> bool:
         steps.append(("WSL2 Networking Mode", lambda: _do_fix_wsl2(env, args)))
     steps.append(("Firewall Rules", lambda: _do_fix_firewall(env, args)))
     steps.append(("Discovery Server Configuration", lambda: _do_fix_discovery(env, args)))
+    if getattr(args, "with_security", False):
+        steps.append(("SROS2 / DDS-Security", lambda: _do_fix_security(env, args)))
 
     total = len(steps)
     for i, (label, fn) in enumerate(steps, 1):
@@ -241,6 +299,7 @@ def _run_wizard(env: EnvironmentInfo, args: argparse.Namespace) -> int:
            for n in failed_names):
         fixes_to_offer.append(("Open firewall ports for DDS / multicast", "firewall"))
     fixes_to_offer.append(("Configure Discovery Server mode (recommended for all setups)", "discovery"))
+    fixes_to_offer.append(("Enable SROS2 encryption and authentication (optional)", "security"))
     fixes_to_offer.append(("Apply all of the above", "all"))
     fixes_to_offer.append(("Exit without fixing", None))
 
@@ -270,6 +329,8 @@ def _run_fix(env: EnvironmentInfo, args: argparse.Namespace) -> int:
         ok = _do_fix_firewall(env, args)
     elif target == "wsl2":
         ok = _do_fix_wsl2(env, args)
+    elif target == "security":
+        ok = _do_fix_security(env, args)
     else:
         ui.error(f"Unknown fix target: {target}")
         return 1
