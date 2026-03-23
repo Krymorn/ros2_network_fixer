@@ -260,7 +260,7 @@ All configuration is written to `~/.ros2_network_fixer/`:
 | ROS 2 Distro | Status |
 |---|---|
 | Jazzy (Ubuntu 24.04) | ✅ Fully tested |
-| Humble (Ubuntu 22.04) | ✅ Fully tested |
+| Humble (Ubuntu 22.04) | ✅ Compatible |
 | Iron | ✅ Compatible |
 | Rolling | ✅ Compatible |
 | Foxy / Galactic | ⚠️ Compatible (EOL distros) |
