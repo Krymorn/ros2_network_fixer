@@ -2,7 +2,8 @@
 diagnostics.py — Network diagnostic checks for ROS 2 DDS.
 
 Tests multicast reachability, lists active nodes/topics,
-checks firewall and port accessibility, and emits structured results.
+checks firewall and port accessibility, QoS mismatches, RMW mismatches,
+interface binding issues, domain ID conflicts, and security posture.
 """
 
 from __future__ import annotations
@@ -20,11 +21,39 @@ from typing import Optional
 from .platform_utils import EnvironmentInfo, _run
 from . import ui
 
-# Lazy import to avoid circular dependency — security imports diagnostics.CheckResult
+# Lazy imports to avoid circular dependencies
 def _get_security_checks(env):
     try:
         from .security import check_security_posture
         return check_security_posture(env)
+    except Exception:
+        return []
+
+def _get_domain_id_checks(env):
+    try:
+        from .domain_id import check_domain_id
+        return check_domain_id(env)
+    except Exception:
+        return []
+
+def _get_rmw_checks(env):
+    try:
+        from .rmw import check_rmw
+        return check_rmw(env)
+    except Exception:
+        return []
+
+def _get_interface_checks(env):
+    try:
+        from .interfaces import check_interface_binding
+        return check_interface_binding(env)
+    except Exception:
+        return []
+
+def _get_qos_checks(env):
+    try:
+        from .qos import check_qos_mismatches
+        return check_qos_mismatches(env)
     except Exception:
         return []
 
@@ -340,6 +369,18 @@ def run_diagnostics(env: EnvironmentInfo, verbose: bool = False) -> DiagReport:
 
     # Security posture checks (always included — insecure default is worth surfacing)
     report.results.extend(_get_security_checks(env))
+
+    # Domain ID collision risk
+    report.results.extend(_get_domain_id_checks(env))
+
+    # RMW implementation and mismatch risk
+    report.results.extend(_get_rmw_checks(env))
+
+    # Network interface binding (multi-interface ambiguity)
+    report.results.extend(_get_interface_checks(env))
+
+    # QoS mismatch detection (only if topics are active)
+    report.results.extend(_get_qos_checks(env))
 
     return report
 

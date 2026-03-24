@@ -36,6 +36,7 @@ class EnvironmentInfo:
     os_type: str                          # "windows", "linux", "macos"
     os_version: str
     in_wsl2: bool
+    wsl_version: int                      # 1 or 2; 0 if not WSL
     wsl2_networking_mode: Optional[str]   # "nat", "mirrored", None
     in_docker: bool
     ros2_distro: Optional[str]
@@ -45,6 +46,8 @@ class EnvironmentInfo:
     hostname: str = ""
     has_sudo: bool = False
     has_powershell: bool = False
+    rmw_impl: Optional[str] = None        # detected RMW implementation
+    domain_id: int = 0                    # current ROS_DOMAIN_ID
 
 
 # ---------------------------------------------------------------------------
@@ -77,44 +80,77 @@ def _detect_os() -> tuple[str, str]:
     return system, version
 
 
-def _detect_wsl2() -> tuple[bool, Optional[str]]:
-    """Return (in_wsl2, networking_mode)."""
+def _detect_wsl2() -> tuple[bool, int, Optional[str]]:
+    """
+    Return (in_wsl, wsl_version, networking_mode).
+
+    wsl_version: 0 = not WSL, 1 = WSL1, 2 = WSL2
+    networking_mode: "nat" | "mirrored" | None
+    """
     if platform.system().lower() != "linux":
-        return False, None
+        return False, 0, None
 
     # Check /proc/version for Microsoft kernel string
     try:
-        proc_version = Path("/proc/version").read_text()
-        if "microsoft" not in proc_version.lower():
-            return False, None
+        proc_version = Path("/proc/version").read_text().lower()
+        if "microsoft" not in proc_version:
+            return False, 0, None
     except OSError:
-        return False, None
+        return False, 0, None
 
-    # Confirm WSL_DISTRO_NAME or WSL_INTEROP env var
-    if not (os.environ.get("WSL_DISTRO_NAME") or os.environ.get("WSL_INTEROP")):
-        return False, None
+    # Confirm it's actually WSL (not just a Microsoft-built kernel)
+    is_wsl = bool(
+        os.environ.get("WSL_DISTRO_NAME")
+        or os.environ.get("WSL_INTEROP")
+        or Path("/proc/sys/fs/binfmt_misc/WSLInterop").exists()
+    )
+    if not is_wsl:
+        return False, 0, None
 
-    # Detect networking mode via /proc/net or wsl2 kernel cmdline
-    networking_mode = "nat"  # default assumption
+    # Distinguish WSL1 vs WSL2
+    # WSL2 runs a real Linux kernel with its own network namespace;
+    # WSL1 translates syscalls — it does NOT have /dev/kmsg or a real kernel cmdline.
+    # The most reliable signal: WSL2 has a non-empty /run/WSL directory or
+    # the kernel version contains "microsoft-standard" (WSL2 kernel).
+    wsl_version = 1
     try:
-        cmdline = Path("/proc/cmdline").read_text()
-        if "mirror" in cmdline.lower():
+        kern = proc_version
+        if "microsoft-standard" in kern or "wsl2" in kern:
+            wsl_version = 2
+        elif Path("/dev/kmsg").exists():
+            # WSL2 has /dev/kmsg; WSL1 does not
+            wsl_version = 2
+    except Exception:
+        wsl_version = 2  # safe default — WSL1 is very rare now
+
+    if wsl_version == 1:
+        # WSL1 has different (but simpler) network issues — no NAT layer
+        return True, 1, "wsl1"
+
+    # WSL2 networking mode detection
+    networking_mode = "nat"  # default for WSL2
+    try:
+        cmdline = Path("/proc/cmdline").read_text().lower()
+        if "mirror" in cmdline:
             networking_mode = "mirrored"
     except OSError:
         pass
 
-    # Also check if we share the same IP range as Windows host
-    try:
-        _, resolv, _ = _run(["cat", "/etc/resolv.conf"])
-        rc, route_out, _ = _run(["ip", "route"])
-        if rc == 0:
-            # In mirrored mode the default route goes through a 172.x address
-            if "172.16." in route_out or "192.168." in route_out:
-                pass  # still NAT most likely
-    except Exception:
-        pass
+    # Secondary heuristic: in mirrored mode the WSL2 IP matches the Windows IP
+    # We look for the absence of the default 172.x WSL2 NAT gateway
+    if networking_mode == "nat":
+        try:
+            rc, route_out, _ = _run(["ip", "route"])
+            if rc == 0 and "172." not in route_out:
+                # No 172.x gateway → likely mirrored or custom networking
+                # Check if resolv.conf points to a local address (mirrored sign)
+                resolv = Path("/etc/resolv.conf").read_text()
+                if re.search(r"nameserver\s+(?!172\.)", resolv):
+                    networking_mode = "mirrored"
+        except Exception:
+            pass
 
-    return True, networking_mode
+    return True, wsl_version, networking_mode
 
 
 def _detect_docker() -> bool:
@@ -235,11 +271,19 @@ def _has_powershell() -> bool:
 
 def detect_environment() -> EnvironmentInfo:
     """Probe the current environment and return a populated EnvironmentInfo."""
+    import os as _os
     os_type, os_version = _detect_os()
-    in_wsl2, wsl2_mode = _detect_wsl2()
+    in_wsl, wsl_version, wsl2_mode = _detect_wsl2()
+    in_wsl2 = in_wsl and wsl_version == 2
     in_docker = _detect_docker()
     ros2_distro, ros2_home = _detect_ros2()
     interfaces = _detect_interfaces()
+
+    # ROS_DOMAIN_ID
+    try:
+        domain_id = int(_os.environ.get("ROS_DOMAIN_ID", "0"))
+    except ValueError:
+        domain_id = 0
 
     try:
         hostname = socket.gethostname()
@@ -250,6 +294,7 @@ def detect_environment() -> EnvironmentInfo:
         os_type=os_type,
         os_version=os_version,
         in_wsl2=in_wsl2,
+        wsl_version=wsl_version,
         wsl2_networking_mode=wsl2_mode,
         in_docker=in_docker,
         ros2_distro=ros2_distro,
@@ -259,6 +304,8 @@ def detect_environment() -> EnvironmentInfo:
         hostname=hostname,
         has_sudo=_has_sudo(),
         has_powershell=_has_powershell(),
+        rmw_impl=_os.environ.get("RMW_IMPLEMENTATION"),
+        domain_id=domain_id,
     )
 
 

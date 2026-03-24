@@ -72,7 +72,7 @@ def _c(color: str, text: str) -> str:
 def banner() -> None:
     print()
     print(_c(_C.HEAD, "╔══════════════════════════════════════════════════════════╗"))
-    print(_c(_C.HEAD, "║        ROS 2  Cross-Platform  Network  Fixer  v1.0       ║"))
+    print(_c(_C.HEAD, "║        ROS 2  Cross-Platform  Network  Fixer  v1.1       ║"))
     print(_c(_C.HEAD, "║   Automates DDS discovery · firewall · WSL2 · Docker     ║"))
     print(_c(_C.HEAD, "╚══════════════════════════════════════════════════════════╝"))
     print()

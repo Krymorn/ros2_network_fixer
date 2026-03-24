@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "ros2-network-fixer"
-version = "1.0.0"
+version = "1.1.0"
 description = "Cross-platform ROS 2 DDS network fixer — automates Discovery Server, firewall, and WSL2 configuration"
 readme = "README.md"
 license = {text = "MIT"}
@@ -35,8 +35,8 @@ dependencies = []
 ros2_network_fixer = "ros2_network_fixer.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/Krymorn/ros2_network_fixer"
-Issues = "https://github.com/Krymorn/ros2_network_fixer/issues"
+Homepage = "https://github.com/Krymorn/ros2-network-fixer"
+Issues = "https://github.com/Krymorn/ros2-network-fixer/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
