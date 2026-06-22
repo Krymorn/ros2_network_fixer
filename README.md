@@ -59,7 +59,7 @@ The result: nodes appear invisible, topics don't flow, and QoS mismatches cause 
 
 ## Installation
 
-### Option A — pip
+### Option A — pip (not avalible yet)
 
 ```bash
 pip install ros2-network-fixer
